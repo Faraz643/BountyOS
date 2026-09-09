@@ -15,6 +15,13 @@ export interface Bounty {
   technologies: string[];
   discoveredAt: string;
   updatedAt: string;
+  signals?: {
+    comments: number;
+    reactions: number;
+    assignees: number;
+    hasLinkedPullRequest: boolean;
+    createdAt?: string;
+  };
 }
 
 export interface BountyVerification {
