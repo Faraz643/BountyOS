@@ -21,6 +21,9 @@ export interface Bounty {
     assignees: number;
     hasLinkedPullRequest: boolean;
     createdAt?: string;
+    rewardVerified?: boolean;
+    rewardConfidence?: number;
+    rewardSource?: string;
   };
 }
 
