@@ -1,20 +1,16 @@
 name: BountyOS Sandbox Test
 on:
-  workflow_dispatch:
-    inputs:
-      branch:
-        required: true
-        type: string
+  pull_request:
+    types: [opened, synchronize, reopened]
 permissions:
   contents: read
 jobs:
   test:
+    if: startsWith(github.head_ref, 'bountyos/')
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.branch }}
       - uses: actions/setup-node@v4
         with:
           node-version: 20
