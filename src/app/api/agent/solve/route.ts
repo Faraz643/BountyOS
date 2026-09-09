@@ -8,13 +8,14 @@ const SOURCE_EXT = /\.(ts|tsx|js|jsx|py|go|rs|java|kt|rb|php|cs|cpp|c|h|md|json|
 const MANIFEST = /(^|\/)(package\.json|pnpm-lock\.yaml|yarn\.lock|package-lock\.json|pyproject\.toml|requirements\.txt|go\.mod|Cargo\.toml|pom\.xml|build\.gradle|Gemfile|composer\.json|README\.md)$/i;
 
 function keywords(text: string) {
-  return [...new Set((text.toLowerCase().match(/[a-z][a-z0-9+#.-]{2,}/g) || []).filter(x => !["the","and","for","with","this","that","issue","when","from","into","should","would","could","have","will","there","then","also","not","are","was","but","use","using"].includes(x)))];
+  const stop = new Set(["the","and","for","with","this","that","issue","when","from","into","should","would","could","have","will","there","then","also","not","are","was","but","use","using"]);
+  return [...new Set((text.toLowerCase().match(/[a-z][a-z0-9+#.-]{2,}/g) || []).filter(x => !stop.has(x)))];
 }
 
 export async function POST(req: Request) {
   const user = await getCurrentUser();
   if (!user) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  const { bountyId, attemptId } = await req.json();
+  const { bountyId, attemptId, force } = await req.json();
   const bounty = await db.bounty.findUnique({ where: { id: bountyId } });
   if (!bounty) return NextResponse.json({ error: "Bounty not found" }, { status: 404 });
   if (!user.githubAccessToken) return NextResponse.json({ error: "Reconnect GitHub to enable solver." }, { status: 401 });
@@ -23,6 +24,11 @@ export async function POST(req: Request) {
   if (attemptId) {
     attempt = await db.attempt.findFirst({ where: { id: attemptId, userId: user.id, bountyId } });
     if (!attempt) return NextResponse.json({ error: "Attempt not found" }, { status: 404 });
+    const existing = !force ? await db.agentRun.findFirst({ where: { userId: user.id, bountyId, type: "coding", status: "completed", inputSummary: `${bounty.owner}/${bounty.repository}#${bounty.issueNumber}` }, orderBy: { createdAt: "desc" } }) : null;
+    if (existing?.output) {
+      await db.attempt.update({ where: { id: attempt.id }, data: { status: "solution_ready" } });
+      return NextResponse.json({ runId: existing.id, plan: existing.output, reused: true });
+    }
     await db.attempt.update({ where: { id: attempt.id }, data: { status: "solving" } });
   }
 
@@ -59,7 +65,7 @@ export async function POST(req: Request) {
       try {
         const c = await gh.contents(bounty.owner, bounty.repository, path, meta.default_branch);
         if (c.content && typeof c.content === "string") files.push({ path, content: Buffer.from(c.content, "base64").toString("utf8").slice(0, 14000) });
-      } catch { /* one unreadable file must not abort the whole run */ }
+      } catch { /* continue with files that are readable */ }
     }
 
     const skills = (user.skills || []).map((s: any) => `${s.category}:${s.name} (${s.level})`).join(", ") || "No skills profile configured";
@@ -78,12 +84,10 @@ export async function POST(req: Request) {
 
     const ai = new CompatibleAIProvider();
     const result = await ai.generatePatch({ issue: issuePayload, repo: `${bounty.owner}/${bounty.repository} @ ${meta.default_branch}`, files: files.map(f => `===== ${f.path} =====\n${f.content}`) });
-    await db.agentRun.update({ where: { id: run.id }, data: {
-      status: "completed", output: { ...result, context: { filesRead: files.map(f => f.path), repository: `${bounty.owner}/${bounty.repository}`, branch: meta.default_branch } },
-      confidence: result.confidence ?? 60, finishedAt: new Date(),
-    }});
+    const output = { ...result, context: { filesRead: files.map(f => f.path), repository: `${bounty.owner}/${bounty.repository}`, branch: meta.default_branch } };
+    await db.agentRun.update({ where: { id: run.id }, data: { status: "completed", output, confidence: result.confidence ?? 60, finishedAt: new Date() } });
     if (attempt) await db.attempt.update({ where: { id: attempt.id }, data: { status: result.files.length ? "solution_ready" : "blocked" } });
-    return NextResponse.json({ runId: run.id, plan: result, context: { filesRead: files.map(f => f.path), defaultBranch: meta.default_branch } });
+    return NextResponse.json({ runId: run.id, plan: output, context: output.context });
   } catch (e) {
     const message = e instanceof Error ? e.message : "Solver failed";
     await db.agentRun.update({ where: { id: run.id }, data: { status: "failed", error: message, finishedAt: new Date() } });
