@@ -59,6 +59,9 @@ model Bounty {
   description String
   reward Float?
   currency String?
+  rewardVerified Boolean @default(false)
+  rewardConfidence Int @default(0)
+  rewardSource String?
   status String
   labels String[]
   technologies String[]
@@ -73,6 +76,7 @@ model Bounty {
   earnings Earning[]
   @@index([source, status])
   @@index([updatedAt])
+  @@index([rewardVerified, reward])
 }
 
 model BountyAnalysis {
