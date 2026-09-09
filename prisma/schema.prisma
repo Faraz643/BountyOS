@@ -1,0 +1,123 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id          String   @id @default(cuid())
+  githubId    String   @unique
+  username    String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  skills      UserSkill[]
+  preferences UserPreference?
+  saved       SavedBounty[]
+  skipped     SkippedBounty[]
+  attempts    Attempt[]
+}
+
+model UserSkill {
+  id       String @id @default(cuid())
+  userId   String
+  category String
+  name     String
+  level    String
+  user     User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([userId, category, name])
+  @@index([userId])
+}
+
+model UserPreference {
+  id                 String   @id @default(cuid())
+  userId             String   @unique
+  minimumBounty      Float?
+  maxEstimatedHours  Float?
+  currencies         String[]
+  workTypes          String[]
+  user               User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model Bounty {
+  id          String   @id
+  source      String
+  sourceUrl   String
+  owner       String
+  repository  String
+  issueNumber Int
+  title       String
+  description String
+  reward      Float?
+  currency    String?
+  status      String
+  labels      String[]
+  technologies String[]
+  discoveredAt DateTime
+  updatedAt    DateTime
+  analyses    BountyAnalysis[]
+  savedBy     SavedBounty[]
+  skippedBy   SkippedBounty[]
+  attempts    Attempt[]
+  @@index([source, status])
+  @@index([updatedAt])
+}
+
+model BountyAnalysis {
+  id                    String   @id @default(cuid())
+  bountyId              String
+  difficulty             String
+  workType               String
+  issueClarity           Int
+  technicalFit           Int
+  repositoryHealth       Int
+  competition            String
+  minimumHours           Float
+  likelyHours            Float
+  maximumHours           Float
+  successProbability     Int
+  acceptanceProbability  Int
+  opportunityScore       Int
+  expectedHourlyMin      Float
+  expectedHourlyMax      Float
+  reasons                String[]
+  risks                  String[]
+  createdAt              DateTime @default(now())
+  bounty                 Bounty @relation(fields: [bountyId], references: [id], onDelete: Cascade)
+  @@index([bountyId])
+  @@index([opportunityScore])
+}
+
+model SavedBounty {
+  id String @id @default(cuid())
+  userId String
+  bountyId String
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bounty Bounty @relation(fields: [bountyId], references: [id], onDelete: Cascade)
+  @@unique([userId, bountyId])
+}
+
+model SkippedBounty {
+  id String @id @default(cuid())
+  userId String
+  bountyId String
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bounty Bounty @relation(fields: [bountyId], references: [id], onDelete: Cascade)
+  @@unique([userId, bountyId])
+}
+
+model Attempt {
+  id String @id @default(cuid())
+  userId String
+  bountyId String
+  status String @default("planned")
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  bounty Bounty @relation(fields: [bountyId], references: [id], onDelete: Cascade)
+  @@index([userId, status])
+}
