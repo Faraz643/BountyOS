@@ -1,13 +1,6 @@
 import { NextResponse } from "next/server";
 import { GitHubBountySource } from "@/integrations/github/bounty-source";
-
-export async function GET(request: Request) {
-  const url = new URL(request.url);
-  const minReward = Number(url.searchParams.get("minReward") || 0);
-  try {
-    const bounties = await new GitHubBountySource().search({ query: url.searchParams.get("q") || undefined, minReward: Number.isFinite(minReward) ? minReward : undefined });
-    return NextResponse.json({ data: bounties, count: bounties.length });
-  } catch (error) {
-    return NextResponse.json({ error: error instanceof Error ? error.message : "Bounty discovery failed" }, { status: 502 });
-  }
-}
+import { buildAnalysis } from "@/lib/bounty/scoring";
+import { db } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth";
+export async function GET(request:Request){const u=new URL(request.url);const min=Number(u.searchParams.get("minReward")||0);try{const source=new GitHubBountySource();const raw=await source.search({query:u.searchParams.get("q")||undefined,minReward:Number.isFinite(min)?min:undefined});const user=await getCurrentUser();const profile=user?{languages:user.skills.filter(s=>s.category==="language").map(s=>s.name),frameworks:user.skills.filter(s=>s.category==="framework").map(s=>s.name),databases:user.skills.filter(s=>s.category==="database").map(s=>s.name),level:(user.skills[0]?.level||"intermediate") as any}:{languages:[],frameworks:[],databases:[],level:"intermediate" as const};const ranked=raw.map(b=>({bounty:b,analysis:buildAnalysis(b,profile)})).sort((a,b)=>b.analysis.opportunityScore-a.analysis.opportunityScore);await Promise.all(ranked.slice(0,20).map(async x=>db.bounty.upsert({where:{id:x.bounty.id},update:{title:x.bounty.issue.title,description:x.bounty.issue.description,reward:x.bounty.reward.amount,currency:x.bounty.reward.currency,status:x.bounty.status,labels:x.bounty.labels,technologies:x.bounty.technologies,updatedAt:new Date(x.bounty.updatedAt)},create:{id:x.bounty.id,source:x.bounty.source,sourceUrl:x.bounty.sourceUrl,owner:x.bounty.repository.owner,repository:x.bounty.repository.name,issueNumber:x.bounty.issue.number,title:x.bounty.issue.title,description:x.bounty.issue.description,reward:x.bounty.reward.amount,currency:x.bounty.reward.currency,status:x.bounty.status,labels:x.bounty.labels,technologies:x.bounty.technologies,discoveredAt:new Date(x.bounty.discoveredAt),updatedAt:new Date(x.bounty.updatedAt)}})));return NextResponse.json({data:ranked,count:ranked.length});}catch(e){return NextResponse.json({error:e instanceof Error?e.message:"Bounty discovery failed"},{status:502});}}
