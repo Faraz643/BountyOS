@@ -1,74 +1,100 @@
 # BountyOS
 
-**AI Bounty Hunter → Solver → PR Agent → Review Agent → Earner**
+BountyOS is an AI-assisted bounty operating system for finding paid software work, analyzing feasibility, solving issues, validating changes, and preparing pull requests.
 
-BountyOS finds software-development opportunities where your estimated probability of success and acceptance justify the expected return per hour.
+## Discovery model
+
+BountyOS is **paid-work first**. The default feed is `Verified paid only` rather than a generic GitHub issue feed.
+
+The discovery pipeline:
+
+```text
+GitHub open issues
+      ↓
+Bounty/reward search
+      ↓
+Issue comments fetched
+      ↓
+Monetary evidence extracted
+      ↓
+Algora `/bounty $...` evidence detected
+      ↓
+Reward confidence calculated
+      ↓
+Paid / verified filtering
+      ↓
+Personal fit + effort + competition scoring
+      ↓
+Rank by opportunity
+```
+
+### Reward states
+
+- **Verified paid** — a strong monetary signal was found, including Algora bounty-command evidence in GitHub comments.
+- **Paid / verify** — a monetary amount was detected but the evidence is not strong enough to call it verified.
+- **All GitHub issues** — optional discovery mode for research; these are not treated as paid opportunities.
+
+BountyOS does not call an ordinary GitHub issue a paid bounty simply because it has an interesting label or because a reward is unknown.
+
+## Solver pipeline
+
+```text
+Verified bounty
+   ↓
+Start attempt
+   ↓
+Repository analysis
+   ↓
+AI solution plan
+   ↓
+Proposed changes
+   ↓
+Human approval
+   ↓
+Branch + commit
+   ↓
+Pull request
+   ↓
+Sandbox / CI
+   ↓
+AI PR review
+   ↓
+Earnings tracking
+```
+
+Repository changes require explicit approval; autonomous execution is not enabled by default.
 
 ## AI providers
 
-BountyOS has a provider-independent AI layer. **Gemini is the default** and can use Google's Gemini API Free Tier for eligible models/projects. Local Ollama is also supported when you want the model to run on your own machine.
+BountyOS supports Gemini and local Ollama-based models through the provider abstraction. For development, a local coding model can be used without consuming cloud API credits.
 
-### Gemini
-
-Create an API key in Google AI Studio and configure:
-
-```env
-AI_PROVIDER=gemini
-GEMINI_API_KEY=your_key
-GEMINI_MODEL=gemini-3.7-flash
-```
-
-Never put the API key in client-side code or commit it to Git.
-
-### Local Ollama
-
-```env
-AI_PROVIDER=ollama
-OLLAMA_BASE_URL=http://127.0.0.1:11434
-OLLAMA_MODEL=qwen3-coder
-```
-
-## Implemented architecture
-
-1. **Hunter** — GitHub discovery, reward extraction, normalization, verification signals, repository intelligence, competition analysis, technical fit and transparent opportunity scoring.
-2. **Profile** — GitHub OAuth, skills, difficulty/effort preferences, currencies and work-type preferences.
-3. **Solver** — provider-agnostic AI planning and patch generation using a bounded set of repository files. Repository code is treated as untrusted input and is never executed by the agent.
-4. **PR Agent** — creates an isolated branch, applies the generated files, and creates a pull request only after explicit user approval.
-5. **Review Agent** — reads PR reviews/comments and produces actionable feedback for another user-approved solver run.
-6. **Earnings** — persistent attempts, PR records and payment/earning records are ready for reconciliation.
-7. **Learning-ready data model** — agent runs, predictions and outcomes are persisted for future calibration.
-
-## Runtime boundary
-
-BountyOS does not silently claim bounties, merge PRs, execute arbitrary repository code, or send GitHub comments. Production deployments should add an isolated sandbox before enabling test execution or unrestricted coding-agent workflows.
-
-## Setup
+## Local setup
 
 ```bash
 npm install
-cp .env.example .env.local
 npx prisma generate
 npx prisma db push
 npm run dev
 ```
 
-Configure a GitHub OAuth App with callback URL:
-`http://localhost:3000/api/auth/github/callback`
+Configure `.env` with the database, GitHub OAuth, session secret, and the selected AI provider.
 
-Required: `GITHUB_CLIENT_ID`, `GITHUB_CLIENT_SECRET`, `DATABASE_URL`, `SESSION_SECRET`.
-Optional: `GITHUB_TOKEN` for server-side public discovery.
+For Ollama:
 
-## API surface
+```env
+AI_PROVIDER=ollama
+OLLAMA_BASE_URL=http://127.0.0.1:11434
+OLLAMA_MODEL=qwen2.5-coder:7b
+```
 
-- `GET /api/bounties` — discover and rank live opportunities
-- `GET /api/bounties/:id` — opportunity detail
-- `POST /api/bounties/analyze` — repository + competition analysis
-- `POST /api/bounties/action` — save / skip / attempt
-- `GET /api/me` — current user
-- `PUT /api/profile` — skills/preferences
-- `POST /api/ai/solve` — generate an implementation plan/patch
-- `GET /api/ai/health` — inspect configured AI provider
+For Gemini:
 
-## Cost philosophy
+```env
+AI_PROVIDER=gemini
+GEMINI_API_KEY=...
+GEMINI_MODEL=...
+```
 
-No paid AI provider is required for development: Gemini currently offers a Free Tier for eligible API models/projects, subject to rate limits. Ollama provides a local-provider option. GitHub, PostgreSQL, and AI providers remain replaceable through adapters.
+## Important
+
+Reward detection is evidence-based but cannot guarantee that a sponsor will pay. Always open the original bounty page/issue, read its terms and acceptance criteria, and verify eligibility before starting work.
