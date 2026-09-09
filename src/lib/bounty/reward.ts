@@ -15,7 +15,7 @@ const MONEY_PATTERNS: Array<{ currency: string; regex: RegExp }> = [
   { currency: "AUD", regex: /(?:AUD\s*)\$?\s*([\d,]+(?:\.\d+)?)/gi }
 ];
 
-const BOUNTY_CONTEXT = /(?:bounty|reward|prize|payment|paid|tip|funded|award|payout|/bounty|algora)/i;
+const BOUNTY_CONTEXT = /(?:bounty|reward|prize|payment|paid|tip|funded|award|payout|\/bounty|algora)/i;
 
 export function extractRewards(text: string, source: RewardEvidence["source"] = "issue"): RewardEvidence[] {
   const results: RewardEvidence[] = [];
@@ -27,7 +27,7 @@ export function extractRewards(text: string, source: RewardEvidence["source"] = 
       const end = Math.min(text.length, (match.index ?? 0) + match[0].length + 100);
       const context = text.slice(start, end);
       if (!BOUNTY_CONTEXT.test(context)) continue;
-      const confidence = /\/bounty\s+[$€£₹]?\s*[\d,]+/i.test(match[0] + context) ? 95 : source === "comment" ? 90 : 75;
+      const confidence = /\/bounty\s+[$€£₹]?\s*[\d,]+/i.test(context) ? 95 : source === "comment" ? 90 : 75;
       results.push({ amount, currency, confidence, source, matchedText: match[0] });
     }
   }
