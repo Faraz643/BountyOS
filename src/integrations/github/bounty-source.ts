@@ -14,8 +14,12 @@ const TECHNOLOGIES = [
 function detectTechnologies(text: string, labels: string[]): string[] {
   const haystack = `${text} ${labels.join(" ")}`.toLowerCase();
   return [...new Set(TECHNOLOGIES.filter((technology) => {
-    const escaped = technology.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    return new RegExp(`(^|[^a-z0-9+#])${escaped.replace(/\\\./g, "[.]" )}([^a-z0-9+#]|$)`, "i").test(haystack);
+    const needle = technology.toLowerCase();
+    const index = haystack.indexOf(needle);
+    if (index < 0) return false;
+    const before = haystack[index - 1] ?? " ";
+    const after = haystack[index + needle.length] ?? " ";
+    return !/[a-z0-9]/i.test(before) || !/[a-z0-9]/i.test(after);
   }))];
 }
 
