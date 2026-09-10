@@ -20,10 +20,16 @@ export interface Bounty {
     reactions: number;
     assignees: number;
     hasLinkedPullRequest: boolean;
+    hasOpenPullRequest?: boolean;
+    hasAnyPullRequest?: boolean;
     createdAt?: string;
     rewardVerified?: boolean;
     rewardConfidence?: number;
     rewardSource?: string;
+    issueAgeDays?: number;
+    inactivityDays?: number;
+    strictEligible?: boolean;
+    exclusionReasons?: string[];
   };
 }
 
